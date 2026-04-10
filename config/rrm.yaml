@@ -1,0 +1,6 @@
+hydra:
+  searchpath:
+    - file:///workspace/mnt/lxb_work/verl/verl/trainer/config
+defaults:
+  - ppo_trainer
+  - _self_

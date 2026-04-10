@@ -1,0 +1,44 @@
+### model
+model_name_or_path: /workspace/mnt/lxb_work/MindMirror/GRM-omni-ckpt/grm_omni_ACL/grm_lang_sft_qwen-vl-1225
+image_max_pixels: 262144
+video_max_pixels: 16384
+trust_remote_code: true
+# use_v1_kernels: true  # replaced kernels: [NpuRMSNormKernel, NpuRoPEKernel, NpuQwen3VLMoEFusedMoEKernel]
+
+### method
+stage: dpo
+do_train: true
+finetuning_type: full
+freeze_vision_tower: true
+freeze_multi_modal_projector: true
+freeze_language_model: false
+deepspeed: /workspace/mnt/lxb_work/LLaMA-Factory/examples/deepspeed/ds_z3_config.json
+
+# dataset: grm_omni_sft
+dataset: grm_lang_dpo
+template: qwen3_vl
+cutoff_len: 8192
+max_samples: 25000
+overwrite_cache: true
+preprocessing_num_workers: 64
+dataloader_num_workers: 0
+
+### output
+output_dir: /workspace/mnt/lxb_work/MindMirror/GRM-omni-ckpt/grm_omni_ACL/grm_lang_dpo_1226
+# output_dir: /workspace/mnt/lxb_work/MindMirror/GRM-omni-ckpt/grm_omni_ACL/grm_omni_sft_qwen-vl
+logging_steps: 5
+save_steps: 100
+plot_loss: true
+overwrite_output_dir: true
+save_only_model: false
+
+### train
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 8
+learning_rate: 1.0e-6
+num_train_epochs: 1.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+bf16: true
+ddp_timeout: 180000000
+resume_from_checkpoint: null

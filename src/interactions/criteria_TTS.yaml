@@ -1,0 +1,4 @@
+interaction:
+  - name: "criteria_TTS_interaction"
+    class_name: "src.interactions.criteria_TTS_interaction.CriteriaTTSInteraction"
+    config: {}

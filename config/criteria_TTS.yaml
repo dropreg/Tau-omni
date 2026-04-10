@@ -1,0 +1,17 @@
+hydra:
+  searchpath:
+    - file:///workspace/mnt/lxb_work/verl/verl/trainer/config
+defaults:
+  - ppo_trainer
+  - _self_
+
+
+actor_rollout_ref:
+  hybrid_engine: True
+  rollout:
+    name: sglang
+    multi_turn:
+      enable: True
+      max_user_turns: 3
+      max_assistant_turns: 3
+      interaction_config_path: /workspace/mnt/lxb_work/MindMirror/GRM-omni-train-v1/src/interactions/criteria_TTS.yaml

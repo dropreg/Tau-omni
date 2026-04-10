@@ -1,0 +1,48 @@
+### model
+model_name_or_path: /workspace/mnt/hf_models/Meta-Llama-3.1-8B-Instruct
+# /workspace/mnt/lxb_work/hf_dir/hf_model/Qwen/Qwen3-VL-8B-Instruct
+# model_name_or_path: /workspace/mnt/lxb_work/hf_dir/hf_model/Qwen/Qwen2.5-7B-Instruct
+image_max_pixels: 262144
+video_max_pixels: 16384
+trust_remote_code: true
+# use_v1_kernels: true  # replaced kernels: [NpuRMSNormKernel, NpuRoPEKernel, NpuQwen3VLMoEFusedMoEKernel]
+
+### method
+stage: sft
+do_train: true
+finetuning_type: full
+freeze_vision_tower: true
+freeze_multi_modal_projector: true
+freeze_language_model: false
+deepspeed: /workspace/mnt/lxb_work/LLaMA-Factory/examples/deepspeed/ds_z3_config.json
+
+# dataset: grm_omni_sft
+dataset: grm_lang_sft_v2
+# template: qwen3_vl
+# template: qwen
+template: llama3
+cutoff_len: 6144
+max_samples: 10000
+overwrite_cache: true
+preprocessing_num_workers: 64
+dataloader_num_workers: 0
+
+### output
+# output_dir: /workspace/mnt/lxb_work/MindMirror/GRM-omni-ckpt/grm_omni_ACL/grm_lang_sft_qwen-2.5-1227
+output_dir: /workspace/mnt/lxb_work/MindMirror/GRM-omni-ckpt/grm_omni_ACL/grm_lang_sft_llama
+logging_steps: 5
+save_steps: 2000
+plot_loss: true
+overwrite_output_dir: true
+save_only_model: false
+
+### train
+per_device_train_batch_size: 4
+gradient_accumulation_steps: 2
+learning_rate: 1.0e-5
+num_train_epochs: 1.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+bf16: true
+ddp_timeout: 180000000
+resume_from_checkpoint: null

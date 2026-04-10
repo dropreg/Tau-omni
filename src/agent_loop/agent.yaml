@@ -1,0 +1,2 @@
+- name: criteria_TTS
+  _target_: src.agent_loop.criteria_TTS_agent_loop.CriteriaTTSAgentLoop
