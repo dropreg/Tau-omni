@@ -1,0 +1,10 @@
+# Core training stack
+verl==0.7.0
+llamafactory==0.9.4
+
+# Data preparation
+pyarrow
+
+# Recipe utilities
+fastapi
+uvicorn
