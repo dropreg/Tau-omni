@@ -2,6 +2,7 @@ import argparse
 
 from common import (
     DEFAULT_REPO_TYPE,
+    call_with_supported_kwargs,
     ensure_existing_dir,
     login_hub,
     resolve_token,
@@ -46,11 +47,13 @@ def main() -> None:
     local_dir = ensure_existing_dir(args.local_dir)
     api = login_hub(token)
 
-    api.upload_folder(
+    call_with_supported_kwargs(
+        api.upload_folder,
         repo_id=args.repo_id,
         folder_path=str(local_dir),
         repo_type=args.repo_type,
         commit_message=args.commit_message,
+        path_in_repo="",
     )
 
     print(f"Uploaded {local_dir} to {args.repo_id}")

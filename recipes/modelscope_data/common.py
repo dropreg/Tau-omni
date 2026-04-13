@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from inspect import signature
 
 
 DEFAULT_REPO_TYPE = "dataset"
@@ -12,6 +13,11 @@ def resolve_token(token: str | None) -> str:
             "ModelScope token is required. Pass --token or set MODELSCOPE_API_TOKEN."
         )
     return resolved
+
+
+def resolve_optional_token(token: str | None) -> str | None:
+    resolved = token or os.environ.get("MODELSCOPE_API_TOKEN", "")
+    return resolved or None
 
 
 def ensure_local_dir(path: str) -> Path:
@@ -41,3 +47,8 @@ def login_hub(token: str):
     api.login(token)
     return api
 
+
+def call_with_supported_kwargs(func, **kwargs):
+    supported = signature(func).parameters
+    filtered_kwargs = {key: value for key, value in kwargs.items() if key in supported}
+    return func(**filtered_kwargs)

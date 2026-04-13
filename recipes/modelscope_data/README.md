@@ -33,8 +33,17 @@ python recipes/modelscope_data/download_dataset.py \
 - `--dataset-id`：ModelScope 数据集 ID，例如 `your_org/your_dataset`
 - `--local-dir`：本地保存目录
 - `--revision`：可选，指定分支或版本
-- `--token`：可选，显式传入 token
+- `--token`：可选，显式传入 token。公有数据集通常不需要。
 - `--repo-type`：默认是 `dataset`
+
+下载脚本参考 ModelScope 官方 `snapshot_download` 文档风格实现：
+
+```python
+from modelscope import snapshot_download
+snapshot_download(...)
+```
+
+如果是私有仓库或需要鉴权，脚本会先登录再下载。
 
 ## 上传数据集
 
@@ -65,4 +74,3 @@ python recipes/modelscope_data/upload_dataset.py \
 ```bash
 pip install -U modelscope
 ```
-

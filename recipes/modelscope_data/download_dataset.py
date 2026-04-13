@@ -1,6 +1,12 @@
 import argparse
 
-from common import DEFAULT_REPO_TYPE, ensure_local_dir, resolve_token
+from common import (
+    DEFAULT_REPO_TYPE,
+    call_with_supported_kwargs,
+    ensure_local_dir,
+    login_hub,
+    resolve_optional_token,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -37,22 +43,26 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    token = resolve_token(args.token)
+    token = resolve_optional_token(args.token)
     local_dir = ensure_local_dir(args.local_dir)
+    if token:
+        login_hub(token)
 
     try:
-        from modelscope.hub.snapshot_download import snapshot_download
+        from modelscope import snapshot_download
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
             "modelscope is required. Install it with `pip install modelscope`."
         ) from exc
 
-    snapshot_download(
+    call_with_supported_kwargs(
+        snapshot_download,
         repo_id=args.dataset_id,
+        dataset_id=args.dataset_id,
         repo_type=args.repo_type,
         revision=args.revision,
         cache_dir=str(local_dir),
-        token=token,
+        local_dir=str(local_dir),
     )
 
     print(f"Downloaded {args.dataset_id} to {local_dir}")
@@ -60,4 +70,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
