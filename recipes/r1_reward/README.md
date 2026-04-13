@@ -2,177 +2,37 @@
 
 [返回 Tau-omni 主页](../../README.md)
 
-R1-Reward / RM-R1 是一个基于 verl/GRPO 训练生成式奖励模型的 recipe。它的核心目标是把 reward model 从“直接打分”的 ScalarRM，转成“先推理、再判断”的 GenRM：模型读取用户问题和两个候选回答，输出分析过程，并在最后给出可验证的偏好结论 `[[A]]` 或 `[[B]]`。
+R1-Reward 是一个基于 verl/GRPO 训练生成式奖励模型的 recipe。它的核心目标是把 reward model 从“直接打分”的 ScalarRM，转成“先推理、再判断”的 GenRM：模型读取用户问题和两个候选回答，输出分析过程，并在最后给出可验证的偏好结论 `[[A]]` 或 `[[B]]`。
 
-## 背景
+## 基于强化学习的生成式奖励模型训练
 
-这个 recipe 主要参考两篇工作：
+<p align="center">
+  <img src="image.png" alt="R1-Reward" width="700">
+</p>
 
-- [RM-R1: Reward Modeling as Reasoning](https://arxiv.org/abs/2505.02387)：把 reward modeling 表述为 reasoning task，通过蒸馏和 RL 训练 Reasoning Reward Model。
-- [R1-Reward: Training Multimodal Reward Model Through Stable Reinforcement Learning](https://arxiv.org/abs/2505.02835)：用稳定强化学习训练多模态 reward model，让模型具备更强的长链路判断能力。
+这个 recipe 主要参考 RM-R1。该工作将 Reward Modeling 从“打分问题”重新建模为“推理问题”，引入 Reasoning Reward Models，使模型在给出判断前先进行显式推理，从而提升性能与可解释性。
 
-本 recipe 当前先在 RaR-Science 上做语言版实验，后续可以扩展到更多 reward-as-reasoning 数据。
+RM-R1 通过 **推理蒸馏 + 强化学习** 的两阶段训练，并引入 Chain-of-Rubrics（CoR）机制，让模型能够根据任务动态生成评价标准，或者先完成分析再给出判断。实验结果表明，RM-R1 在多个 Reward Benchmark 上都表现出较强性能，能够用更小的模型取得接近甚至超过大模型的效果，同时输出更结构化、可解释的判断过程。
 
 ## 数据流
 
-当前数据处理逻辑分为三层：
+当前使用流程比较简单，主要分为两步：
 
-1. **原始任务数据**
+1. **下载数据**
 
-   RaR-Science / RaR-Medicine 来源于 **Rubrics as Rewards: Reinforcement Learning Beyond Verifiable Domains**。可以从 Hugging Face 下载：
+   先下载 Skywork 数据集：
 
-   - <https://huggingface.co/datasets/anisha2102/RaR-Science/tree/main/data>
-   - 国内环境也可以使用 huggingface 镜像下载 `anisha2102/RaR-Science`
-
-   下载后先调用 `build_rar_science`，整理成：
-
-   ```text
-   data/r1_reward/RaR-Science-Raw.jsonl
+   ```bash
+   bash recipes/modelscope_data/run.sh
    ```
 
-2. **候选回答采样**
+2. **训练模型**
 
-   使用不同 Qwen 模型为每个问题生成 32 个候选回答，并保留模型回答、参考答案和 rubric 信息：
+   再启动训练：
 
-   ```text
-   data/r1_reward/RaR-Science-policy32.jsonl
+   ```bash
+   bash recipes/r1_reward/r1_rm_train.sh
    ```
-
-3. **偏好对构造**
-
-   对 32 个候选回答进行自动评估：用 LLM 预测每个候选是否正确、给出得分，并通过一致性过滤构造成对比较数据：
-
-   ```text
-   data/r1_reward/RaR-Science-Preference.jsonl
-   ```
-
-   当前 `RaR-Science-Preference.jsonl` 使用 conversations 格式：
-
-   ```json
-   {
-     "conversations": [
-       {"role": "user", "content": "... Response A ... Response B ..."},
-       {"role": "assistant", "content": "The final verdict is [[A]]."}
-     ]
-   }
-   ```
-
-4. **verl 训练数据**
-
-   使用 [`prepare_rar_science_rm.py`](prepare_rar_science_rm.py) 将 preference JSONL 转成 verl 可读取的 parquet：
-
-   ```text
-   data/r1_reward/RaR-Science-Preference.parquet
-   ```
-
-## 文件说明
-
-| 文件 | 作用 |
-| --- | --- |
-| [`prepare_rar_science_rm.py`](prepare_rar_science_rm.py) | 将 `RaR-Science-Preference.jsonl` 转成 verl-compatible parquet。兼容 conversations 格式，也兼容直接 pair 字段。 |
-| [`r1_rm_train.sh`](r1_rm_train.sh) | 基于 `src.trainer.main_ppo` 启动 R1-Reward / GRPO 训练。 |
-| [`verl_merge_fsdb.sh`](verl_merge_fsdb.sh) | 训练后合并 verl FSDP actor checkpoint。 |
-
-## 运行流程
-
-### 1. 准备 parquet 数据
-
-默认读取 `data/r1_reward/RaR-Science-Preference.jsonl`，输出 `data/r1_reward/RaR-Science-Preference.parquet`：
-
-```bash
-python recipes/r1_reward/prepare_rar_science_rm.py
-```
-
-也可以手动指定路径：
-
-```bash
-python recipes/r1_reward/prepare_rar_science_rm.py \
-  --input data/r1_reward/RaR-Science-Preference.jsonl \
-  --output data/r1_reward/RaR-Science-Preference.parquet
-```
-
-如果输入数据里有少量坏样本，可以跳过无效行：
-
-```bash
-python recipes/r1_reward/prepare_rar_science_rm.py --skip-invalid
-```
-
-如果只想检查 JSONL 是否能被脚本解析，而不写 parquet：
-
-```bash
-python recipes/r1_reward/prepare_rar_science_rm.py --dry-run
-```
-
-### 2. 启动 GRPO 训练
-
-```bash
-TRAIN_DATA_PATH=data/r1_reward/RaR-Science-Preference.parquet \
-TEST_DATA_PATH=data/r1_reward/RaR-Science-Preference.parquet \
-MODEL_PATH=/path/to/Qwen3-VL-8B-Instruct \
-SAVE_DIR=/path/to/checkpoints/r1_reward \
-bash recipes/r1_reward/r1_rm_train.sh
-```
-
-训练脚本中的所有关键路径都支持环境变量覆盖。运行前重点检查：
-
-- `TRAIN_DATA_PATH`
-- `TEST_DATA_PATH`
-- `MODEL_PATH`
-- `CONFIG_PATH`
-- `REWARD_PATH`
-- `SAVE_DIR`
-
-### 3. 合并 checkpoint
-
-训练完成后，如果需要把 FSDP actor checkpoint 合并成标准模型目录：
-
-```bash
-bash recipes/r1_reward/verl_merge_fsdb.sh
-```
-
-## 输出格式
-
-训练时 reward function 依赖最终 verdict。模型输出可以包含推理过程，但最后必须能解析出：
-
-```text
-[[A]]
-```
-
-或：
-
-```text
-[[B]]
-```
-
-`prepare_rar_science_rm.py` 会把 `[[A]]` 映射成 `ground_truth=0`，把 `[[B]]` 映射成 `ground_truth=1`，写入 verl 的 `reward_model.ground_truth` 字段。
-
-## 脚本逻辑
-
-[`prepare_rar_science_rm.py`](prepare_rar_science_rm.py) 的输出记录格式如下：
-
-```python
-{
-    "data_source": "RaR-Science",
-    "prompt": [{"role": "user", "content": judge_prompt}],
-    "reward_model": {"ground_truth": 0},
-    "extra_info": {
-        "idx": 1,
-        "format": "conversations",
-        "verdict": "A"
-    }
-}
-```
-
-脚本支持两种输入：
-
-- `conversations`：直接读取第一轮 user prompt，并从第二轮 assistant 中解析最终 verdict。
-- `pair`：如果输入包含 `query + response_1 + response_2 + ground_truth`，脚本会自动拼接 judge prompt。
-
-写 parquet 依赖 `pyarrow`。如果环境没有安装，可以先运行：
-
-```bash
-pip install pyarrow
-```
 
 ## 参考论文
 
