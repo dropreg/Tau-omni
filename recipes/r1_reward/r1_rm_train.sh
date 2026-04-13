@@ -13,10 +13,10 @@ echo "Using ${N_GPU} GPUs: ${CUDA_VISIBLE_DEVICES}"
 ray stop || true
 ray start --head --node-ip-address 0.0.0.0 --num-gpus "${N_GPU}" --num-cpus "${RAY_NUM_CPUS:-64}"
 
-TRAIN_DATA_PATH=${TRAIN_DATA_PATH:-data/r1_reward/RaR-Science-Preference.parquet}
+TRAIN_DATA_PATH=${TRAIN_DATA_PATH:-data/modelscope/Skywork-Reward-Preference-80K-v0.2/data/train_criteria_tts.parquet}
 TEST_DATA_PATH=${TEST_DATA_PATH:-${TRAIN_DATA_PATH}}
 MODEL_PATH=${MODEL_PATH:-/workspace/mnt/lxb_work/hf_dir/hf_model/Qwen/Qwen3-VL-8B-Instruct}
-SAVE_DIR=${SAVE_DIR:-/workspace/mnt/lxb_work/GRM/Tau-omni/Tau-omni-ckpt/r1_reward_rar_science}
+SAVE_DIR=${SAVE_DIR:-data/ckpt/r1_reward}
 
 echo "MODEL_PATH: ${MODEL_PATH}"
 echo "TRAIN_DATA_PATH: ${TRAIN_DATA_PATH}"
@@ -24,10 +24,10 @@ echo "TEST_DATA_PATH: ${TEST_DATA_PATH}"
 echo "SAVE_DIR: ${SAVE_DIR}"
 
 python3 -m src.trainer.main_ppo \
-    --config-path=/workspace/mnt/lxb_work/GRM/Tau-omni/config \
-    --config-name=original_grm_omni.yaml \
-    custom_reward_function.path=/workspace/mnt/lxb_work/GRM/Tau-omni/src/reward/original_grm_reward.py \
-    custom_reward_function.name=original_grm_reward \
+    --config-path=/workspace/mnt/lxb_work/Tau-omni/config \
+    --config-name=rule_rm.yaml \
+    custom_reward_function.path=src/reward/rule_reward.py \
+    custom_reward_function.name=rule_reward \
     algorithm.adv_estimator=grpo \
     data.train_files="${TRAIN_DATA_PATH}" \
     data.val_files="${TEST_DATA_PATH}" \
@@ -43,7 +43,7 @@ python3 -m src.trainer.main_ppo \
     actor_rollout_ref.actor.optim.lr=1e-6 \
     actor_rollout_ref.actor.optim.weight_decay=0.1 \
     actor_rollout_ref.actor.ppo_mini_batch_size=32 \
-    actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=8 \
+    actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=2 \
     actor_rollout_ref.actor.use_kl_loss=False \
     actor_rollout_ref.actor.kl_loss_coef=0.0 \
     actor_rollout_ref.actor.entropy_coeff=0 \

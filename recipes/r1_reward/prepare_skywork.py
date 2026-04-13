@@ -1,121 +1,132 @@
-import argparse
-import json
-import os
-from pathlib import Path
-from typing import Any
+import random
+
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 
-DEFAULT_DATASET = "Skywork/Skywork-Reward-Preference-80K-v0.1"
-DEFAULT_SPLIT = "train"
-DEFAULT_OUTPUT = "data/r1_reward/skywork/train.jsonl"
-DEFAULT_HF_ENDPOINT = "https://hf-mirror.com"
+INPUT_PATH = "data/modelscope/Skywork-Reward-Preference-80K-v0.2/data/train-00000-of-00001.parquet"
+OUTPUT_PATH = "data/modelscope/Skywork-Reward-Preference-80K-v0.2/data/train_criteria_tts.parquet"
+
+THINKING_PROMPT = """You are an objective, impartial, and unbiased content evaluator. Given a user query and two candidate assistant responses, produce a rigorous, evidence-based comparison and a single final verdict indicating which response better fulfills the user’s intent.
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description=(
-            "Download Skywork reward preference data via Hugging Face mirror "
-            "and export it as train.jsonl."
+### Important constraints (must follow exactly):
+1. Work only from the provided {query}, {response_1} (Assistant A), and {response_2} (Assistant B). Do not introduce outside facts or assumptions.
+2. Output only the structured block described below and nothing else (no preamble, no postscript).
+3. Use exactly three evaluation criteria (no more, no fewer). The criteria must be distinct (non-overlapping) and focused on observable differences between the two responses.
+4. For each criterion, provide: A short name, A one-sentence explanation of what it measures and why it matters. Each analysis must explicitly identify the response's strengths AND weaknesses, especially the concrete defects relevant to that criterion.
+5. In each analysis: When pointing out a defect, explain why it is a defect with respect to the criterion. If a response lacks relevant content, clearly state it.
+6. After the three criteria blocks, give a single final verdict line containing exactly [[A]] or [[B]].
+
+
+### Required output format:
+<Criteria 1> Name. Explanation. <Judge A>xxx</Judge A>
+<Judge B>xxx</Judge B></Criteria 1>
+<Criteria 2> Name. Explanation. <Judge A>xxx</Judge A>
+<Judge B>xxx</Judge B></Criteria 2>
+<Criteria 3> Name. Explanation. <Judge A>xxx</Judge A>
+<Judge B>xxx</Judge B></Criteria 3>
+The final verdict is [[A]] or [[B]]
+
+
+### Input:[User Question]:
+{query}
+
+[The Start of Assistant A's Answer]:
+{response_1}
+[The End of Assistant A's Answer]
+
+[The Start of Assistant B's Answer]:
+{response_2}
+[The End of Assistant B's Answer]
+Please output your analysis and final verdict:"""
+
+
+def build_criteria_tts_conversation(idx, query, chosen, rejected):
+    if random.random() > 0.5:
+        ground_truth = 1
+        prompt = THINKING_PROMPT.format(
+            query=query,
+            response_1=rejected,
+            response_2=chosen,
         )
-    )
-    parser.add_argument(
-        "--dataset",
-        default=DEFAULT_DATASET,
-        help="Hugging Face dataset name.",
-    )
-    parser.add_argument(
-        "--split",
-        default=DEFAULT_SPLIT,
-        help="Dataset split to export.",
-    )
-    parser.add_argument(
-        "--output",
-        default=DEFAULT_OUTPUT,
-        help="Output jsonl path.",
-    )
-    parser.add_argument(
-        "--cache-dir",
-        default=None,
-        help="Optional Hugging Face datasets cache directory.",
-    )
-    parser.add_argument(
-        "--hf-endpoint",
-        default=DEFAULT_HF_ENDPOINT,
-        help="Mirror endpoint used for Hugging Face Hub access.",
-    )
-    parser.add_argument(
-        "--max-samples",
-        type=int,
-        default=None,
-        help="Optional limit for exported samples.",
-    )
-    return parser.parse_args()
+    else:
+        ground_truth = 0
+        prompt = THINKING_PROMPT.format(
+            query=query,
+            response_1=chosen,
+            response_2=rejected,
+        )
+
+    data = {
+        "data_source": "Skywork-Reward-Preference-80K-v0.2",
+        "agent_name": "criteria_TTS",
+        "prompt": [
+            {
+                "role": "user",
+                "content": prompt,
+            }
+        ],
+        "reward_model": {
+            "ground_truth": ground_truth,
+        },
+        "extra_info": {
+            "idx": idx,
+            "interaction_kwargs": {
+                "name": "grm_omni_criteria_TTS_intraction",
+                "query": query,
+                "rejected": rejected,
+                "chosen": chosen,
+                "ground_truth": ground_truth,
+            },
+        },
+    }
+    return data, ground_truth
 
 
-def ensure_python_types(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {key: ensure_python_types(val) for key, val in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [ensure_python_types(item) for item in value]
+def build_lang_data():
+    parquet_file = pq.ParquetFile(INPUT_PATH)
 
-    # datasets / numpy scalar compatibility
-    if hasattr(value, "item") and callable(value.item):
-        try:
-            return value.item()
-        except Exception:
-            pass
-    return value
+    lang_train_data = []
+    ground_truth_0 = 0
+    ground_truth_1 = 0
 
+    for batch in parquet_file.iter_batches(batch_size=10000):
+        df = batch.to_pandas()
 
-def load_split(dataset_name: str, split: str, cache_dir: str | None):
-    try:
-        from datasets import load_dataset
-    except ModuleNotFoundError as exc:
-        raise ModuleNotFoundError(
-            "datasets is required for downloading from Hugging Face. "
-            "Install it with `pip install datasets`."
-        ) from exc
+        for idx, row in df.iterrows():
+            if len(row["rejected"]) != 2:
+                continue
 
-    return load_dataset(dataset_name, split=split, cache_dir=cache_dir)
+            query = row["chosen"][0]["content"]
+            chosen = row["chosen"][1]["content"]
+            rejected = row["rejected"][1]["content"]
 
+            data, ground_truth = build_criteria_tts_conversation(
+                idx=idx,
+                query=query,
+                chosen=chosen,
+                rejected=rejected,
+            )
+            lang_train_data.append(data)
 
-def export_jsonl(dataset, output_path: Path, max_samples: int | None) -> int:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+            if ground_truth == 1:
+                ground_truth_1 += 1
+            else:
+                ground_truth_0 += 1
 
-    count = 0
-    with output_path.open("w", encoding="utf-8") as writer:
-        for row in dataset:
-            record = ensure_python_types(dict(row))
-            writer.write(json.dumps(record, ensure_ascii=False) + "\n")
-            count += 1
+    print(f"ground_truth=0: {ground_truth_0}")
+    print(f"ground_truth=1: {ground_truth_1}")
+    print(f"total: {len(lang_train_data)}")
 
-            if max_samples is not None and count >= max_samples:
-                break
-
-    return count
+    random.shuffle(lang_train_data)
+    table = pa.Table.from_pylist(lang_train_data)
+    pq.write_table(table, OUTPUT_PATH)
+    print(f"Saved to: {OUTPUT_PATH}")
 
 
-def main() -> None:
-    args = parse_args()
-
-    os.environ["HF_ENDPOINT"] = args.hf_endpoint
-
-    dataset = load_split(
-        dataset_name=args.dataset,
-        split=args.split,
-        cache_dir=args.cache_dir,
-    )
-    output_path = Path(args.output)
-    count = export_jsonl(
-        dataset=dataset,
-        output_path=output_path,
-        max_samples=args.max_samples,
-    )
-
-    print(f"HF_ENDPOINT={args.hf_endpoint}")
-    print(f"Dataset: {args.dataset}")
-    print(f"Split: {args.split}")
-    print(f"Saved {count} samples to {output_path}")
+def main():
+    build_lang_data()
 
 
 if __name__ == "__main__":
