@@ -8,4 +8,5 @@ tmp/
 .DS_Store
 .idea/
 *.pyc
-data/
+data/*
+!data/data_info.json
