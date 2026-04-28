@@ -37,7 +37,7 @@ fi
 
 if [[ -z "$GPU_IDS" ]]; then
   echo "GPU_IDS is empty. Set GPU_IDS or CUDA_VISIBLE_DEVICES first."
-  echo "Example: GPU_IDS=0,1,2,3 NUM_INSTANCES=2 GPUS_PER_INSTANCE=2 bash recipes/gen_rm/run_vllm.sh start"
+  echo "Example: GPU_IDS=0,1,2,3 NUM_INSTANCES=2 GPUS_PER_INSTANCE=2 bash recipes/gen_rm/inference/run_vllm.sh start"
   exit 1
 fi
 
@@ -239,7 +239,7 @@ case "$ACTION" in
     status_all
     ;;
   *)
-    echo "Usage: bash recipes/gen_rm/run_vllm.sh {start|stop|restart|status}"
+    echo "Usage: bash recipes/gen_rm/inference/run_vllm.sh {start|stop|restart|status}"
     exit 1
     ;;
 esac

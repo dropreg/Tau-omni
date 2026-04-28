@@ -10,3 +10,5 @@ tmp/
 *.pyc
 data/*
 !data/data_info.json
+pids/
+logs/
