@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assert/image.png" alt="tau-omni logo" width="500">
+  <img src="asset/image.png" alt="tau-omni logo" width="500">
   <h1>τ-OMNI: Trajectory-Centric Omni Reward–Policy Co-evolution</h1>
   <p>
     <img alt="Python" src="https://img.shields.io/badge/python-≥3.10-blue">

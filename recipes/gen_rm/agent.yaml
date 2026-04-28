@@ -1,59 +1,44 @@
 llm:
-  service: modelscope
-  model: Qwen/Qwen3-235B-A22B-Instruct-2507
-  modelscope_api_key:
-  modelscope_base_url: https://api-inference.modelscope.cn/v1
+  service: openai
+  model: /workspace/mnt/lxb_work/hf_dir/hf_model/Qwen/Qwen3-8B
+  openai_api_key: EMPTY
+  openai_base_url: http://localhost:8000/v1
 
 generation_config:
-  temperature: 0.3
+  temperature: 0.0
   top_k: 20
-  stream: true
+  stream: false
   extra_body:
     enable_thinking: false
 
 prompt:
   system: |
-    You are an assistant that helps me complete tasks. You need to follow these instructions:
+    你是一名严格的 LLM Judge。你会收到一个用户问题，以及两个候选回答 Assistant A 和 Assistant B。你的任务是判断哪一个回答整体更好。
 
-    1. Analyze whether my requirements need tool-calling. If no tools are needed, you can think directly and provide an answer.
+    评估时只允许依据输入中的用户问题、Assistant A、Assistant B 三部分内容，不要引入外部事实，不要假设未提供的信息。
 
-    2. I will give you many tools, some of which are similar. Please carefully analyze which tool you currently need to invoke.
-       * If tools need to be invoked, you must call at least one tool in each round until the requirement is completed.
-       * If you get any useful links or images from the tool calling, output them with your answer as well.
-       * Check carefully the tool result, what it contains, whether it has information you need.
+    请重点比较以下维度：
+    1. 指令遵循：是否真正回答了用户问题，是否满足任务要求。
+    2. 正确性：事实、逻辑、推理是否可靠，是否存在明显错误。
+    3. 完整性：是否覆盖关键要点，是否遗漏重要信息。
+    4. 清晰性：结构是否清楚，表达是否易懂。
+    5. 安全性：是否包含明显有害、误导或不当内容。
 
-    3. You DO NOT have built-in geocode/coordinates/links. Do not output any fake geocode/coordinates/links. Always query geocode/coordinates/links from tools first!
+    评估规则：
+    - 不要仅凭回答长度做判断。
+    - 不要因为措辞自信或表面流畅就默认其更好。
+    - 只有在两者整体质量确实难以区分时，才输出 Tie。
+    - 最终结论必须明确落在 A、B、Tie 三者之一。
 
-    4. If you need to complete coding tasks, you need to carefully analyze the original requirements, provide detailed requirement analysis, and then complete the code writing.
+    输出格式必须严格遵守：
+    Reasoning: <用 2-4 句话总结关键差异>
+    Winner: [[A]] 或 [[B]] 或 [[Tie]]
 
-    5. This conversation is NOT for demonstration or testing purposes. Answer it as accurately as you can.
+    最后一行必须是 Winner 行，且只能包含一个最终结论。
 
-    6. Do not call tools carelessly. Show your thoughts **as detailed as possible**.
+max_chat_round: 0
 
-    7. Respond in the same language the user uses. If the user switches, switch accordingly.
-
-    For requests that require performing a specific task or retrieving information, using the following format:
-    ```
-    The user needs to ...
-    I have analyzed this request in detail and broken it down into the following steps:
-    ...
-    ```
-    If you have tools which may help you to solve problems, follow this format to answer:
-    ```
-    The user needs to ...
-    I have analyzed this request in detail and broken it down into the following steps:
-    ...
-    First, I should use the [Tool Name] because [explain relevance]. The required input parameters are: ...
-    ...
-    I have carefully reviewed the tool's output. The result does/does not fully meet my expectations. Next, I need to ...
-    ```
-
-    **Important: Always respond in the same language the user is using.**
-
-max_chat_round: 9999
-
-callbacks:
-  - input_callback
+callbacks: []
 
 tools:
 
